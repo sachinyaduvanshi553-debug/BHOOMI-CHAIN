@@ -1,0 +1,37 @@
+# ============================================================
+# BhoomiChain – crypto-config.yaml
+# Defines MSP identities for orderer org and two peer orgs:
+#   RevenueOrg  – represents the government revenue department
+#   RegistrarOrg – represents the land registration authority
+# Run: cryptogen generate --config=./crypto-config.yaml
+# ============================================================
+
+OrdererOrgs:
+  - Name: Orderer
+    Domain: bhoomichain.com
+    EnableNodeOUs: true
+    Specs:
+      - Hostname: orderer
+
+PeerOrgs:
+  # ----------------------------------------------------------
+  # RevenueOrg – Government Revenue Department
+  # ----------------------------------------------------------
+  - Name: RevenueOrg
+    Domain: revenueorg.bhoomichain.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1            # peer0.revenueorg.bhoomichain.com
+    Users:
+      Count: 1            # User1@revenueorg.bhoomichain.com
+
+  # ----------------------------------------------------------
+  # RegistrarOrg – Land Registrar Authority
+  # ----------------------------------------------------------
+  - Name: RegistrarOrg
+    Domain: registrarorg.bhoomichain.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1            # peer0.registrarorg.bhoomichain.com
+    Users:
+      Count: 1            # User1@registrarorg.bhoomichain.com

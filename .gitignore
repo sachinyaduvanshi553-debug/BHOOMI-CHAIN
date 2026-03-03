@@ -1,0 +1,27 @@
+# Node.js
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+
+# Blockchain Specific
+blockchain-network/organizations/
+blockchain-network/channel-artifacts/
+backend/wallet/
+backend/fabric/wallet/
+backend/fabric/identities/
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db

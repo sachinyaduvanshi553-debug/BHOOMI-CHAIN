@@ -1,0 +1,177 @@
+# ============================================================
+# BhoomiChain – configtx.yaml
+# Defines: Organizations, Capabilities, Application, Orderer
+#          (Raft etcdraft), Channel, and Profiles
+# Run: configtxgen (see network-up.sh for exact commands)
+# ============================================================
+
+Organizations:
+  # ---- Orderer Organization --------------------------------
+  - &OrdererOrg
+    Name: OrdererMSP
+    ID: OrdererMSP
+    MSPDir: ./crypto-config/ordererOrganizations/bhoomichain.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer.bhoomichain.com:7050
+
+  # ---- RevenueOrg ------------------------------------------
+  - &RevenueOrg
+    Name: RevenueOrgMSP
+    ID: RevenueOrgMSP
+    MSPDir: ./crypto-config/peerOrganizations/revenueorg.bhoomichain.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('RevenueOrgMSP.admin','RevenueOrgMSP.peer','RevenueOrgMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('RevenueOrgMSP.admin','RevenueOrgMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('RevenueOrgMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('RevenueOrgMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.revenueorg.bhoomichain.com
+        Port: 7051
+
+  # ---- RegistrarOrg ----------------------------------------
+  - &RegistrarOrg
+    Name: RegistrarOrgMSP
+    ID: RegistrarOrgMSP
+    MSPDir: ./crypto-config/peerOrganizations/registrarorg.bhoomichain.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('RegistrarOrgMSP.admin','RegistrarOrgMSP.peer','RegistrarOrgMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('RegistrarOrgMSP.admin','RegistrarOrgMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('RegistrarOrgMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('RegistrarOrgMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.registrarorg.bhoomichain.com
+        Port: 9051
+
+# ---- Capabilities -------------------------------------------
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+
+# ---- Application (endorsement policy) -----------------------
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+# ---- Orderer (Raft) -----------------------------------------
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer.bhoomichain.com:7050
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.bhoomichain.com
+        Port: 7050
+        ClientTLSCert: ./crypto-config/ordererOrganizations/bhoomichain.com/orderers/orderer.bhoomichain.com/tls/server.crt
+        ServerTLSCert: ./crypto-config/ordererOrganizations/bhoomichain.com/orderers/orderer.bhoomichain.com/tls/server.crt
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+# ---- Channel ------------------------------------------------
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+# ---- Profiles -----------------------------------------------
+Profiles:
+  # Genesis block for the system channel
+  BhoomiOrdererGenesis:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+      Capabilities:
+        <<: *OrdererCapabilities
+    Consortiums:
+      BhoomiConsortium:
+        Organizations:
+          - *RevenueOrg
+          - *RegistrarOrg
+
+  # Application channel for land registry transactions
+  BhoomiChannel:
+    Consortium: BhoomiConsortium
+    <<: *ChannelDefaults
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *RevenueOrg
+        - *RegistrarOrg
+      Capabilities:
+        <<: *ApplicationCapabilities

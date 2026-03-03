@@ -1,0 +1,259 @@
+# =================================================================
+# BhoomiChain – docker-compose.yaml
+# Starts the complete Hyperledger Fabric network:
+#   - 1 Raft Orderer
+#   - 2 CA nodes (one per org)
+#   - 2 Peer nodes (one per org)
+#   - 2 CouchDB instances (state database for peers)
+#   - 1 CLI container (for channel/chaincode admin operations)
+# Run from blockchain-network/ directory inside WSL2/Linux
+# =================================================================
+
+version: '3.8'
+
+networks:
+  bhoomi_net:
+    name: bhoomi_net
+
+volumes:
+  orderer.bhoomichain.com:
+  peer0.revenueorg.bhoomichain.com:
+  peer0.registrarorg.bhoomichain.com:
+  couchdb0:
+  couchdb1:
+
+services:
+
+  # ---------------------------------------------------------------
+  # Certificate Authority – RevenueOrg
+  # ---------------------------------------------------------------
+  ca.revenueorg.bhoomichain.com:
+    image: hyperledger/fabric-ca:1.5.7
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-revenueorg
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=7054
+    ports:
+      - "7054:7054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ./crypto-config/peerOrganizations/revenueorg.bhoomichain.com/ca/:/etc/hyperledger/fabric-ca-server
+    container_name: ca.revenueorg.bhoomichain.com
+    networks:
+      - bhoomi_net
+
+  # ---------------------------------------------------------------
+  # Certificate Authority – RegistrarOrg
+  # ---------------------------------------------------------------
+  ca.registrarorg.bhoomichain.com:
+    image: hyperledger/fabric-ca:1.5.7
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-registrarorg
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=8054
+    ports:
+      - "8054:8054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ./crypto-config/peerOrganizations/registrarorg.bhoomichain.com/ca/:/etc/hyperledger/fabric-ca-server
+    container_name: ca.registrarorg.bhoomichain.com
+    networks:
+      - bhoomi_net
+
+  # ---------------------------------------------------------------
+  # Orderer (Raft / etcdraft)
+  # ---------------------------------------------------------------
+  orderer.bhoomichain.com:
+    container_name: orderer.bhoomichain.com
+    image: hyperledger/fabric-orderer:2.5.5
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=7050
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/genesis.block
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_ENABLED=true
+      - ORDERER_ADMIN_TLS_CLIENTAUTHREQUIRED=false
+      - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
+      - ORDERER_OPERATIONS_LISTENADDRESS=orderer.bhoomichain.com:9443
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
+    command: orderer
+    volumes:
+      - ./channel-artifacts/genesis.block:/var/hyperledger/orderer/genesis.block
+      - ./crypto-config/ordererOrganizations/bhoomichain.com/orderers/orderer.bhoomichain.com/msp:/var/hyperledger/orderer/msp
+      - ./crypto-config/ordererOrganizations/bhoomichain.com/orderers/orderer.bhoomichain.com/tls:/var/hyperledger/orderer/tls
+      - orderer.bhoomichain.com:/var/hyperledger/production/orderer
+    ports:
+      - "7050:7050"
+      - "7053:7053"
+      - "9443:9443"
+    networks:
+      - bhoomi_net
+
+  # ---------------------------------------------------------------
+  # CouchDB for peer0.revenueorg
+  # ---------------------------------------------------------------
+  couchdb0:
+    container_name: couchdb0
+    image: couchdb:3.3.2
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    ports:
+      - "5984:5984"
+    volumes:
+      - couchdb0:/opt/couchdb/data
+    networks:
+      - bhoomi_net
+
+  # ---------------------------------------------------------------
+  # Peer0 – RevenueOrg
+  # ---------------------------------------------------------------
+  peer0.revenueorg.bhoomichain.com:
+    container_name: peer0.revenueorg.bhoomichain.com
+    image: hyperledger/fabric-peer:2.5.5
+    environment:
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=bhoomi_net
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_ID=peer0.revenueorg.bhoomichain.com
+      - CORE_PEER_ADDRESS=peer0.revenueorg.bhoomichain.com:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.revenueorg.bhoomichain.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.revenueorg.bhoomichain.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.revenueorg.bhoomichain.com:7051
+      - CORE_PEER_LOCALMSPID=RevenueOrgMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_OPERATIONS_LISTENADDRESS=peer0.revenueorg.bhoomichain.com:9444
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb0:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/revenueorg.bhoomichain.com/peers/peer0.revenueorg.bhoomichain.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/revenueorg.bhoomichain.com/peers/peer0.revenueorg.bhoomichain.com/tls:/etc/hyperledger/fabric/tls
+      - peer0.revenueorg.bhoomichain.com:/var/hyperledger/production
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: peer node start
+    ports:
+      - "7051:7051"
+      - "9444:9444"
+    depends_on:
+      - couchdb0
+    networks:
+      - bhoomi_net
+
+  # ---------------------------------------------------------------
+  # CouchDB for peer0.registrarorg
+  # ---------------------------------------------------------------
+  couchdb1:
+    container_name: couchdb1
+    image: couchdb:3.3.2
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    ports:
+      - "7984:5984"
+    volumes:
+      - couchdb1:/opt/couchdb/data
+    networks:
+      - bhoomi_net
+
+  # ---------------------------------------------------------------
+  # Peer0 – RegistrarOrg
+  # ---------------------------------------------------------------
+  peer0.registrarorg.bhoomichain.com:
+    container_name: peer0.registrarorg.bhoomichain.com
+    image: hyperledger/fabric-peer:2.5.5
+    environment:
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=bhoomi_net
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_ID=peer0.registrarorg.bhoomichain.com
+      - CORE_PEER_ADDRESS=peer0.registrarorg.bhoomichain.com:9051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.registrarorg.bhoomichain.com:9052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.registrarorg.bhoomichain.com:9051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.registrarorg.bhoomichain.com:9051
+      - CORE_PEER_LOCALMSPID=RegistrarOrgMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_OPERATIONS_LISTENADDRESS=peer0.registrarorg.bhoomichain.com:9445
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb1:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/registrarorg.bhoomichain.com/peers/peer0.registrarorg.bhoomichain.com/msp:/etc/hyperledger/fabric/msp
+      - ./crypto-config/peerOrganizations/registrarorg.bhoomichain.com/peers/peer0.registrarorg.bhoomichain.com/tls:/etc/hyperledger/fabric/tls
+      - peer0.registrarorg.bhoomichain.com:/var/hyperledger/production
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: peer node start
+    ports:
+      - "9051:9051"
+      - "9445:9445"
+    depends_on:
+      - couchdb1
+    networks:
+      - bhoomi_net
+
+  # ---------------------------------------------------------------
+  # CLI – admin shell for channel/chaincode management
+  # ---------------------------------------------------------------
+  cli:
+    container_name: cli
+    image: hyperledger/fabric-tools:2.5.5
+    tty: true
+    stdin_open: true
+    environment:
+      - GOPATH=/opt/gopath
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=cli
+      - CORE_PEER_ADDRESS=peer0.revenueorg.bhoomichain.com:7051
+      - CORE_PEER_LOCALMSPID=RevenueOrgMSP
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/revenueorg.bhoomichain.com/peers/peer0.revenueorg.bhoomichain.com/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/revenueorg.bhoomichain.com/peers/peer0.revenueorg.bhoomichain.com/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/revenueorg.bhoomichain.com/peers/peer0.revenueorg.bhoomichain.com/tls/ca.crt
+      - CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/revenueorg.bhoomichain.com/users/Admin@revenueorg.bhoomichain.com/msp
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: /bin/bash
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config:/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto
+      - ./channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts
+      - ../chaincode:/opt/gopath/src/github.com/hyperledger/fabric/peer/chaincode
+      - ./scripts:/opt/gopath/src/github.com/hyperledger/fabric/peer/scripts
+    depends_on:
+      - peer0.revenueorg.bhoomichain.com
+      - peer0.registrarorg.bhoomichain.com
+      - orderer.bhoomichain.com
+    networks:
+      - bhoomi_net
