@@ -12,7 +12,8 @@
  * Returns middleware that checks if req.user.role is in allowedRoles.
  * Call verifyToken BEFORE this middleware so req.user is populated.
  */
-const requireRole = (...allowedRoles) => {
+const requireRole = (...roles) => {
+    const allowedRoles = roles.flat();
     return (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ success: false, message: 'Not authenticated.' });

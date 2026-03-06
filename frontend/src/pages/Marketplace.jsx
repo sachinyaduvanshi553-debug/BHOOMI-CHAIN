@@ -30,10 +30,11 @@ const Marketplace = () => {
         setStatus({ type: 'pending', msg: 'Executing Atomic Swap on Ledger...' });
 
         try {
-            await api.post('/land/buy-land', { landID });
-            setStatus({ type: 'success', msg: 'Asset Purchased Successfully! Ownership transferred.' });
+            const res = await api.post('/land/buy-land', { landID });
+            setStatus({ type: 'success', msg: res.data.message || 'Asset Purchased Successfully! Ownership transferred.' });
             fetchMarketplace();
         } catch (err) {
+            console.error('Purchase Error:', err);
             setStatus({ type: 'error', msg: err.response?.data?.message || 'Transaction Failed' });
         } finally {
             setLoading(false);

@@ -10,6 +10,38 @@ const { requireRole } = require('../middleware/rbac');
 
 const router = express.Router();
 
+/**
+ * @route   GET /api/land/all
+ * @desc    Get all land parcels (Filtered by owner for Citizens)
+ */
+router.get('/all', verifyToken, async (req, res) => {
+    try {
+        const result = await gateway.evaluateTransaction(req.user.email, 'QueryAllLands');
+        let allLands = JSON.parse(result);
+
+        // For this prototype, we'll fetch full details for each to get ownership info
+        // In production, we'd use a more efficient rich query or indexer
+        const detailedLands = await Promise.all(allLands.map(async (l) => {
+            try {
+                const detail = await gateway.evaluateTransaction(req.user.email, 'QueryLand', l.landID);
+                return JSON.parse(detail);
+            } catch (e) {
+                return l;
+            }
+        }));
+
+        // Filter for the current user if they are a citizen
+        const filtered = req.user.role === 'citizen'
+            ? detailedLands.filter(l => l.currentOwner === req.user.email)
+            : detailedLands;
+
+        res.json(filtered);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Failed to fetch land assets' });
+    }
+});
+
 // Multer config for file uploads
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -55,8 +87,12 @@ router.post(
 
             // Save to Audit Log
             await Log.create({
+                userID: req.user.id,
+                userEmail: req.user.email,
+                userRole: req.user.role,
                 action: 'REGISTER_LAND',
-                user: req.user.id,
+                landID: landID,
+                status: 'success',
                 details: `Land ${landID} registered to ${owner}. IPFS: ${documentHash}`,
                 txID: JSON.parse(result).txID || 'local_tx_fail'
             });
@@ -85,8 +121,12 @@ router.post(
             const result = await gateway.submitTransaction(userEmail, 'TransferOwnership', landID, newOwner);
 
             await Log.create({
+                userID: req.user.id,
+                userEmail: req.user.email,
+                userRole: req.user.role,
                 action: 'TRANSFER_LAND',
-                user: req.user.id,
+                landID: landID,
+                status: 'success',
                 details: `Transferred ${landID} to ${newOwner}`,
                 txID: JSON.parse(result).txID
             });
@@ -182,8 +222,12 @@ router.post('/list-for-sale', verifyToken, requireRole(['citizen']), async (req,
     try {
         const result = await gateway.submitTransaction(req.user.email, 'ListLandForSale', landID, price);
         await Log.create({
+            userID: req.user.id,
+            userEmail: req.user.email,
+            userRole: req.user.role,
             action: 'LIST_FOR_SALE',
-            user: req.user.id,
+            landID: landID,
+            status: 'success',
             details: `Listed land ${landID} for sale at ₹${price}`,
             txID: JSON.parse(result).txID
         });
@@ -201,8 +245,12 @@ router.post('/buy-land', verifyToken, requireRole(['citizen']), async (req, res)
     try {
         const result = await gateway.submitTransaction(req.user.email, 'ExecutePurchase', landID, req.user.email);
         await Log.create({
+            userID: req.user.id,
+            userEmail: req.user.email,
+            userRole: req.user.role,
             action: 'BUY_LAND',
-            user: req.user.id,
+            landID: landID,
+            status: 'success',
             details: `Purchased land ${landID}`,
             txID: JSON.parse(result).txID
         });

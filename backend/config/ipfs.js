@@ -10,12 +10,11 @@ class IPFSManager {
         this.client = create({ url: this.ipfsUrl });
     }
 
-    /**
-     * Upload a file buffer to IPFS.
-     * @param {Buffer} fileBuffer - The file data
-     * @returns {string} The CID (Content ID) of the uploaded file
-     */
     async uploadFile(fileBuffer) {
+        if (process.env.MOCK_BLOCKCHAIN === 'true') {
+            console.log('[MOCK] IPFS Uploading dummy file');
+            return 'QmMockCID123456789' + Date.now();
+        }
         try {
             const { cid } = await this.client.add(fileBuffer);
             return cid.toString();
@@ -30,6 +29,10 @@ class IPFSManager {
      * @param {string} cid - The Content ID
      */
     async getFile(cid) {
+        if (process.env.MOCK_BLOCKCHAIN === 'true') {
+            console.log('[MOCK] IPFS Retrieving dummy file for CID:', cid);
+            return Buffer.from('Mock content for CID ' + cid);
+        }
         try {
             const chunks = [];
             for await (const chunk of this.client.cat(cid)) {

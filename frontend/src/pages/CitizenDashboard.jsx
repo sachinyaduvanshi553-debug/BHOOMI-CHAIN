@@ -37,11 +37,12 @@ const CitizenDashboard = () => {
         if (!price) return;
 
         try {
-            await api.post('/land/list-for-sale', { landID, price });
-            setMarketplaceStatus({ type: 'success', msg: `Land ${landID} is now listed in the Marketplace!` });
+            const res = await api.post('/land/list-for-sale', { landID, price });
+            setMarketplaceStatus({ type: 'success', msg: res.data.message || `Land ${landID} is now listed in the Marketplace!` });
             fetchHoldings();
         } catch (err) {
-            setMarketplaceStatus({ type: 'error', msg: 'Marketplace listing failed.' });
+            console.error('Listing Error:', err);
+            setMarketplaceStatus({ type: 'error', msg: err.response?.data?.message || 'Marketplace listing failed.' });
         }
     };
 

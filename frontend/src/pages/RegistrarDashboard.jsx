@@ -21,15 +21,21 @@ const RegistrarDashboard = () => {
         setStatus({ type: 'pending', msg: 'Broadcasting to Blockchain nodes...' });
 
         const data = new FormData();
-        Object.keys(formData).forEach(key => data.append(key, formData[key]));
+        data.append('landID', formData.landID);
+        data.append('owner', formData.ownerEmail);
+        data.append('area', formData.area);
+        data.append('geoCoordinates', formData.geoCoordinates);
+        data.append('value', formData.value);
         if (file) data.append('document', file);
 
         try {
-            const res = await api.post('/land/register', data);
-            setStatus({ type: 'success', msg: `Successfully Registered! Block ID: ${res.data.txId.substring(0, 12)}...` });
+            const res = await api.post('/land/register-land', data);
+            const txID = res.data.data?.txID || 'N/A';
+            setStatus({ type: 'success', msg: `Successfully Registered! Block ID: ${txID.substring(0, 12)}...` });
             setFormData({ landID: '', ownerEmail: '', area: '', geoCoordinates: '', value: '' });
             setFile(null);
         } catch (err) {
+            console.error('Registration Error:', err);
             setStatus({ type: 'error', msg: err.response?.data?.message || 'Transaction Failed' });
         } finally {
             setLoading(false);

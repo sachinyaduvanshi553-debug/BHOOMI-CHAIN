@@ -40,7 +40,7 @@ router.post(
                 // In production, you might want to rollback user creation or mark as 'pending_blockchain'
             }
 
-            const payload = { user: { id: user.id, role: user.role, email: user.email } };
+            const payload = { id: user.id, name: user.name, role: user.role, email: user.email };
             const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
 
             res.status(201).json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
@@ -68,13 +68,13 @@ router.post(
         const { email, password } = req.body;
 
         try {
-            const user = await User.findOne({ email });
+            const user = await User.findOne({ email }).select('+password');
             if (!user) return res.status(400).json({ message: 'Invalid Credentials' });
 
             const isMatch = await user.comparePassword(password);
             if (!isMatch) return res.status(400).json({ message: 'Invalid Credentials' });
 
-            const payload = { user: { id: user.id, role: user.role, email: user.email } };
+            const payload = { id: user.id, name: user.name, role: user.role, email: user.email };
             const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
 
             res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });

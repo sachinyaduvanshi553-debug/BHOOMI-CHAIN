@@ -98,6 +98,26 @@ class FabricGateway {
                     data: JSON.stringify({ owner: 'ramesh@bhoomichain.in' })
                 }]);
             }
+            if (functionName === 'QueryAllLands') {
+                return JSON.stringify([
+                    {
+                        landID: 'MOCK-9901',
+                        geoCoordinates: '28.61, 77.20',
+                        isForSale: true,
+                        askingPrice: 5000000,
+                        mortgageStatus: false,
+                        litigationStatus: false
+                    },
+                    {
+                        landID: 'MOCK-9902',
+                        geoCoordinates: '12.97, 77.59',
+                        isForSale: true,
+                        askingPrice: 8500000,
+                        mortgageStatus: false,
+                        litigationStatus: false
+                    }
+                ]);
+            }
             return JSON.stringify({ status: 'MOCK_SUCCESS' });
         }
 

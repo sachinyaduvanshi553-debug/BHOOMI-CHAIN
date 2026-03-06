@@ -5,7 +5,7 @@
 // Requires MONGODB_URI in environment or uses localhost default.
 // =================================================================
 
-require('dotenv').config({ path: '../backend/.env' });
+require('dotenv').config({ path: './backend/.env' });
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
